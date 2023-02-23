@@ -12,7 +12,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let chars = &result.chars().collect::<Vec<char>>();
     let lexer = Lexer::new(chars);
 
-    println!("{:?}", lexer.content);
+    println!("{result}");
+    println!("----------------");
+    lexer.for_each(|x| println!("{x}"));
 
     Ok(())
 }
