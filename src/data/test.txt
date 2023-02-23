@@ -1,0 +1,24 @@
+From launching our technology preview of the new and improved code search experience a year ago, to the public beta we released at GitHub Universe last November, there’s been a flurry of innovation and dramatic changes to some of the core GitHub product experiences around how we, as developers, find, read, and navigate code.
+
+One question we hear about the new code search experience is, “How does it work?” And to complement a talk I gave at GitHub Universe, this post gives a high-level answer to that question and provides a small window into the system architecture and technical underpinnings of the product.
+
+So, how does it work? The short answer is that we built our own search engine from scratch, in Rust, specifically for the domain of code search. We call this search engine Blackbird, but before I explain how it works, I think it helps to understand our motivation a little bit. At first glance, building a search engine from scratch seems like a questionable decision. Why would you do that? Aren’t there plenty of existing, open source solutions out there already? Why build something new?
+
+To be fair, we’ve tried and have been trying, for almost the entire history of GitHub, to use existing solutions for this problem. You can read a bit more about our journey in Pavel Avgustinov’s post, A brief history of code search at GitHub, but one thing sticks out: we haven’t had a lot of luck using general text search products to power code search. The user experience is poor, indexing is slow, and it’s expensive to host. There are some newer, code-specific open source projects out there, but they definitely don’t work at GitHub’s scale. So, knowing all that, we were motivated to create our own solution by three things:
+
+We’ve got a vision for an entirely new user experience that’s about being able to ask questions of code and get answers through iteratively searching, browsing, navigating, and reading code.
+We understand that code search is uniquely different from general text search. Code is already designed to be understood by machines and we should be able to take advantage of that structure and relevance. Searching code also has unique requirements: we want to search for punctuation (for example, a period or open parenthesis); we don’t want stemming; we don’t want stop words to be stripped from queries; and, we want to search with regular expressions.
+GitHub’s scale is truly a unique challenge. When we first deployed Elasticsearch, it took months to index all of the code on GitHub (about 8 million repositories at the time). Today, that number is north of 200 million, and that code isn’t static: it’s constantly changing and that’s quite challenging for search engines to handle. For the beta, you can currently search almost 45 million repositories, representing 115 TB of code and 15.5 billion documents.
+At the end of the day, nothing off the shelf met our needs, so we built something from scratch.
+
+Just use grep?
+First though, let’s explore the brute force approach to the problem. We get this question a lot: “Why don’t you just use grep?” To answer that, let’s do a little napkin math using ripgrep on that 115 TB of content. On a machine with an eight core Intel CPU, ripgrep can run an exhaustive regular expression query on a 13 GB file cached in memory in 2.769 seconds, or about 0.6 GB/sec/core.
+
+We can see pretty quickly that this really isn’t going to work for the larger amount of data we have. Code search runs on 64 core, 32 machine clusters. Even if we managed to put 115 TB of code in memory and assume we can perfectly parallelize the work, we’re going to saturate 2,048 CPU cores for 96 seconds to serve a single query! Only that one query can run. Everybody else has to get in line. This comes out to a whopping 0.01 queries per second (QPS) and good luck doubling your QPS—that’s going to be a fun conversation with leadership about your infrastructure bill.
+
+There’s just no cost-effective way to scale this approach to all of GitHub’s code and all of GitHub’s users. Even if we threw a ton of money at the problem, it still wouldn’t meet our user experience goals.
+
+You can see where this is going: we need to build an index.
+
+A search index primer
+We can only make queries fast if we pre-compute a bunch of information in the form of indices, which you can think of as maps from keys to sorted lists of document IDs (called “posting lists”) where that key appears. As an example, here’s a small index for programming languages. We scan each document to detect what programming language it’s written in, assign a document ID, and then create an inverted index where language is the key and the value is a posting list of document IDs.
