@@ -1,0 +1,542 @@
+7. DUT set up
+
+   Before starting to perform the tests, the DUT to be tested MUST be
+   configured following the instructions provided to the user.
+   Specifically, it is expected that all of the supported protocols will
+   be configured and enabled during this set up (See Appendix A).  It is
+   expected that all of the tests will be run without changing the
+   configuration or setup of the DUT in any way other than that required
+   to do the specific test.  For example, it is not acceptable to change
+   the size of frame handling buffers between tests of frame handling
+   rates or to disable all but one transport protocol when testing the
+   throughput of that protocol.  It is necessary to modify the
+   configuration when starting a test to determine the effect of filters
+   on throughput, but the only change MUST be to enable the specific
+   filter. The DUT set up SHOULD include the normally recommended
+   routing update intervals and keep alive frequency.  The specific
+   version of the software and the exact DUT configuration, including
+   what functions are disabled, used during the tests MUST be included
+   as part of the report of the results.
+
+8. Frame formats
+
+   The formats of the test frames to use for TCP/IP over Ethernet are
+   shown in Appendix C: Test Frame Formats.  These exact frame formats
+   SHOULD be used in the tests described in this document for this
+   protocol/media combination and that these frames will be used as a
+   template for testing other protocol/media combinations.  The specific
+   formats that are used to define the test frames for a particular test
+   series MUST be included in the report of the results.
+
+9. Frame sizes
+
+   All of the described tests SHOULD be performed at a number of frame
+   sizes. Specifically, the sizes SHOULD include the maximum and minimum
+   legitimate sizes for the protocol under test on the media under test
+   and enough sizes in between to be able to get a full characterization
+   of the DUT performance.  Except where noted, at least five frame
+   sizes SHOULD be tested for each test condition.
+
+   Theoretically the minimum size UDP Echo request frame would consist
+   of an IP header (minimum length 20 octets), a UDP header (8 octets)
+   and whatever MAC level header is required by the media in use.  The
+   theoretical maximum frame size is determined by the size of the
+   length field in the IP header.  In almost all cases the actual
+   maximum and minimum sizes are determined by the limitations of the
+   media.
+
+
+
+
+Bradner & McQuaid            Informational                      [Page 5]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+   In theory it would be ideal to distribute the frame sizes in a way
+   that would evenly distribute the theoretical frame rates.  These
+   recommendations incorporate this theory but specify frame sizes which
+   are easy to understand and remember.  In addition, many of the same
+   frame sizes are specified on each of the media types to allow for
+   easy performance comparisons.
+
+   Note: The inclusion of an unrealistically small frame size on some of
+   the media types (i.e. with little or no space for data) is to help
+   characterize the per-frame processing overhead of the DUT.
+
+9.1 Frame sizes to be used on Ethernet
+
+       64, 128, 256, 512, 1024, 1280, 1518
+
+   These sizes include the maximum and minimum frame sizes permitted by
+   the Ethernet standard and a selection of sizes between these extremes
+   with a finer granularity for the smaller frame sizes and higher frame
+   rates.
+
+9.2 Frame sizes to be used on 4Mb and 16Mb token ring
+
+       54, 64, 128, 256, 1024, 1518, 2048, 4472
+
+   The frame size recommendations for token ring assume that there is no
+   RIF field in the frames of routed protocols.  A RIF field would be
+   present in any direct source route bridge performance test.  The
+   minimum size frame for UDP on token ring is 54 octets.  The maximum
+   size of 4472 octets is recommended for 16Mb token ring instead of the
+   theoretical size of 17.9Kb because of the size limitations imposed by
+   many token ring interfaces.  The reminder of the sizes are selected
+   to permit direct comparisons with other types of media.  An IP (i.e.
+   not UDP) frame may be used in addition if a higher data rate is
+   desired, in which case the minimum frame size is 46 octets.
+
+9.3 Frame sizes to be used on FDDI
+
+       54, 64, 128, 256, 1024, 1518, 2048, 4472
+
+   The minimum size frame for UDP on FDDI is 53 octets, the minimum size
+   of 54 is recommended to allow direct comparison to token ring
+   performance.  The maximum size of 4472 is recommended instead of the
+   theoretical maximum size of 4500 octets to permit the same type of
+   comparison. An IP (i.e. not UDP) frame may be used in addition if a
+   higher data rate is desired, in which case the minimum frame size is
+   45 octets.
+
+
+
+
+
+Bradner & McQuaid            Informational                      [Page 6]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+9.4 Frame sizes in the presence of disparate MTUs
+
+   When the interconnect DUT supports connecting links with disparate
+   MTUs, the frame sizes for the link with the *larger* MTU SHOULD be
+   used, up to the limit of the protocol being tested. If the
+   interconnect DUT does not support the fragmenting of frames in the
+   presence of MTU mismatch, the forwarding rate for that frame size
+   shall be reported as zero.
+
+   For example, the test of IP forwarding with a bridge or router that
+   joins FDDI and Ethernet should use the frame sizes of FDDI when going
+   from the FDDI to the Ethernet link. If the bridge does not support IP
+   fragmentation, the forwarding rate for those frames too large for
+   Ethernet should be reported as zero.
+
+10. Verifying received frames
+
+   The test equipment SHOULD discard any frames received during a test
+   run that are not actual forwarded test frames.  For example, keep-
+   alive and routing update frames SHOULD NOT be included in the count
+   of received frames.  In any case, the test equipment SHOULD verify
+   the length of the received frames and check that they match the
+   expected length.
+
+   Preferably, the test equipment SHOULD include sequence numbers in the
+   transmitted frames and check for these numbers on the received
+   frames.  If this is done, the reported results SHOULD include in
+   addition to the number of frames dropped, the number of frames that
+   were received out of order, the number of duplicate frames received
+   and the number of gaps in the received frame numbering sequence.
+   This functionality is required for some of the described tests.
+
+11. Modifiers
+
+   It might be useful to know the DUT performance under a number of
+   conditions; some of these conditions are noted below.  The reported
+   results SHOULD include as many of these conditions as the test
+   equipment is able to generate.  The suite of tests SHOULD be first
+   run without any modifying conditions and then repeated under each of
+   the conditions separately.  To preserve the ability to compare the
+   results of these tests any frames that are required to generate the
+   modifying conditions (management queries for example) will be
+   included in the same data stream as the normal test frames in place
+   of one of the test frames and not be supplied to the DUT on a
+   separate network port.
+
+
+
+
+
+
+Bradner & McQuaid            Informational                      [Page 7]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+11.1 Broadcast frames
+
+   In most router designs special processing is required when frames
+   addressed to the hardware broadcast address are received.  In bridges
+   (or in bridge mode on routers) these broadcast frames must be flooded
+   to a number of ports.  The stream of test frames SHOULD be augmented
+   with 1% frames addressed to the hardware broadcast address.  The
+   frames sent to the broadcast address should be of a type that the
+   router will not need to process.  The aim of this test is to
+   determine if there is any effect on the forwarding rate of the other
+   data in the stream.  The specific frames that should be used are
+   included in the test frame format document. The broadcast frames
+   SHOULD be evenly distributed throughout the data stream, for example,
+   every 100th frame.
+
+   The same test SHOULD be performed on bridge-like DUTs but in this
+   case the broadcast packets will be processed and flooded to all
+   outputs.
+
+   It is understood that a level of broadcast frames of 1% is much
+   higher than many networks experience but, as in drug toxicity
+   evaluations, the higher level is required to be able to gage the
+   effect which would otherwise often fall within the normal variability
+   of the system performance.  Due to design factors some test equipment
+   will not be able to generate a level of alternate frames this low.
+   In these cases the percentage SHOULD be as small as the equipment can
+   provide and that the actual level be described in the report of the
+   test results.
+
+11.2 Management frames
+
+   Most data networks now make use of management protocols such as SNMP.
+   In many environments there can be a number of management stations
+   sending queries to the same DUT at the same time.
+
+   The stream of test frames SHOULD be augmented with one management
+   query as the first frame sent each second during the duration of the
+   trial.  The result of the query must fit into one response frame. The
+   response frame SHOULD be verified by the test equipment. One example
+   of the specific query frame that should be used is shown in Appendix
+   C.
+
+11.3 Routing update frames
+
+   The processing of dynamic routing protocol updates could have a
+   significant impact on the ability of a router to forward data frames.
+   The stream of test frames SHOULD be augmented with one routing update
+   frame transmitted as the first frame transmitted during the trial.
+
+
+
+Bradner & McQuaid            Informational                      [Page 8]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+   Routing update frames SHOULD be sent at the rate specified in
+   Appendix C for the specific routing protocol being used in the test.
+   Two routing update frames are defined in Appendix C for the TCP/IP
+   over Ethernet example.  The routing frames are designed to change the
+   routing to a number of networks that are not involved in the
+   forwarding of the test data.  The first frame sets the routing table
+   state to "A", the second one changes the state to "B".  The frames
+   MUST be alternated during the trial.
+
+   The test SHOULD verify that the routing update was processed by the
+   DUT.
+
+11.4 Filters
+
+   Filters are added to routers and bridges to selectively inhibit the
+   forwarding of frames that would normally be forwarded.  This is
+   usually done to implement security controls on the data that is
+   accepted between one area and another. Different products have
+   different capabilities to implement filters.
+
+   The DUT SHOULD be first configured to add one filter condition and
+   the tests performed.  This filter SHOULD permit the forwarding of the
+   test data stream. In routers this filter SHOULD be of the form:
+
+      forward input_protocol_address to output_protocol_address
+
+   In bridges the filter SHOULD be of the form:
+
+      forward destination_hardware_address
+
+   The DUT SHOULD be then reconfigured to implement a total of 25
+   filters.  The first 24 of these filters SHOULD be of the form:
+
+      block input_protocol_address to output_protocol_address
+
+   The 24 input and output protocol addresses SHOULD not be any that are
+   represented in the test data stream.  The last filter SHOULD permit
+   the forwarding of the test data stream.  By "first" and "last" we
+   mean to ensure that in the second case, 25 conditions must be checked
+   before the data frames will match the conditions that permit the
+   forwarding of the frame. Of course, if the DUT reorders the filters
+   or does not use a linear scan of the filter rules the effect of the
+   sequence in which the filters are input is properly lost.
+
+   The exact filters configuration command lines used SHOULD be included
+   with the report of the results.
+
+
+
+
+
+Bradner & McQuaid            Informational                      [Page 9]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+11.4.1 Filter Addresses
+
+   Two sets of filter addresses are required, one for the single filter
+   case and one for the 25 filter case.
+
+   The single filter case should permit traffic from IP address
+   198.18.1.2 to IP address 198.19.65.2 and deny all other traffic.
+
+   The 25 filter case should follow the following sequence.
+
+         deny aa.ba.1.1 to aa.ba.100.1
+         deny aa.ba.2.2 to aa.ba.101.2
+         deny aa.ba.3.3 to aa.ba.103.3
+           ...
+         deny aa.ba.12.12 to aa.ba.112.12
+         allow aa.bc.1.2 to aa.bc.65.1
+         deny aa.ba.13.13 to aa.ba.113.13
+         deny aa.ba.14.14 to aa.ba.114.14
+           ...
+         deny aa.ba.24.24 to aa.ba.124.24
+         deny all else
+
+
+   All previous filter conditions should be cleared from the router
+   before this sequence is entered.  The sequence is selected to test to
+   see if the router sorts the filter conditions or accepts them in the
+   order that they were entered.  Both of these procedures will result
+   in a greater impact on performance than will some form of hash
+   coding.
+
+12. Protocol addresses
+
+   It is easier to implement these tests using a single logical stream
+   of data, with one source protocol address and one destination
+   protocol address, and for some conditions like the filters described
+   above, a practical requirement. Networks in the real world are not
+   limited to single streams of data. The test suite SHOULD be first run
+   with a single protocol (or hardware for bridge tests) source and
+   destination address pair.  The tests SHOULD then be repeated with
+   using a random destination address.  While testing routers the
+   addresses SHOULD be random and uniformly distributed over a range of
+   256 networks and random and uniformly distributed over the full MAC
+   range for bridges.  The specific address ranges to use for IP are
+   shown in Appendix C.
+
+
+
+
+
+
+
+Bradner & McQuaid            Informational                     [Page 10]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+13. Route Set Up
+
+   It is not reasonable that all of the routing information necessary to
+   forward the test stream, especially in the multiple address case,
+   will be manually set up.  At the start of each trial a routing update
+   MUST be sent to the DUT. This routing update MUST include all of the
+   network addresses that will be required for the trial.  All of the
+   addresses SHOULD resolve to the same "next-hop". Normally this will
+   be the address of the receiving side of the test equipment. This
+   routing update will have to be repeated at the interval required by
+   the routing protocol being used.  An example of the format and
+   repetition interval of the update frames is given in Appendix C.
+
+14. Bidirectional traffic
+
+   Normal network activity is not all in a single direction.  To test
+   the bidirectional performance of a DUT, the test series SHOULD be run
+   with the same data rate being offered from each direction. The sum of
+   the data rates should not exceed the theoretical limit for the media.
+
+15. Single stream path
+
+   The full suite of tests SHOULD be run along with whatever modifier
+   conditions that are relevant using a single input and output network
+   port on the DUT. If the internal design of the DUT has multiple
+   distinct pathways, for example, multiple interface cards each with
+   multiple network ports, then all possible types of pathways SHOULD be
+   tested separately.
+
+16. Multi-port
+
+   Many current router and bridge products provide many network ports in
+   the same module. In performing these tests first half of the ports
+   are designated as "input ports" and half are designated as "output
+   ports".  These ports SHOULD be evenly distributed across the DUT
+   architecture. For example if a DUT has two interface cards each of
+   which has four ports, two ports on each interface card are designated
+   as input and two are designated as output.  The specified tests are
+   run using the same data rate being offered to each of the input
+   ports.  The addresses in the input data streams SHOULD be set so that
+   a frame will be directed to each of the output ports in sequence so
+   that all "output" ports will get an even distribution of packets from
+   this input.  The same configuration MAY be used to perform a
+   bidirectional multi-stream test.  In this case all of the ports are
+   considered both input and output ports and each data stream MUST
+   consist of frames addressed to all of the other ports.
+
+
+
+
+
+Bradner & McQuaid            Informational                     [Page 11]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+   Consider the following 6 port DUT:
+
+                              --------------
+                     ---------| in A  out X|--------
+                     ---------| in B  out Y|--------
+                     ---------| in C  out Z|--------
+                              --------------
+
+   The addressing of the data streams for each of the inputs SHOULD be:
+
+    stream sent to input A:
+      packet to out X, packet to out Y, packet to out Z
+    stream sent to input B:
+      packet to out X, packet to out Y, packet to out Z
+    stream sent to input C
+      packet to out X, packet to out Y, packet to out Z
+
+   Note that these streams each follow the same sequence so that 3
+   packets will arrive at output X at the same time, then 3 packets at
+   Y, then 3 packets at Z. This procedure ensures that, as in the real
+   world, the DUT will have to deal with multiple packets addressed to
+   the same output at the same time.
+
+17. Multiple protocols
+
+   This document does not address the issue of testing the effects of a
+   mixed protocol environment other than to suggest that if such tests
+   are wanted then frames SHOULD be distributed between all of the test
+   protocols.  The distribution MAY approximate the conditions on the
+   network in which the DUT would be used.
+
+18. Multiple frame sizes
+
+   This document does not address the issue of testing the effects of a
+   mixed frame size environment other than to suggest that if such tests
+   are wanted then frames SHOULD be distributed between all of the
+   listed sizes for the protocol under test.  The distribution MAY
+   approximate the conditions on the network in which the DUT would be
+   used. The authors do not have any idea how the results of such a test
+   would be interpreted other than to directly compare multiple DUTs in
+   some very specific simulated network.
+
+19. Testing performance beyond a single DUT.
+
+   In the performance testing of a single DUT, the paradigm can be
+   described as applying some input to a DUT and monitoring the output.
+   The results of which can be used to form a basis of characterization
+   of that device under those test conditions.
+
+
+
+Bradner & McQuaid            Informational                     [Page 12]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+   This model is useful when the test input and output are homogenous
+   (e.g., 64-byte IP, 802.3 frames into the DUT; 64 byte IP, 802.3
+   frames out), or the method of test can distinguish between dissimilar
+   input/output. (E.g., 1518 byte IP, 802.3 frames in; 576 byte,
+   fragmented IP, X.25 frames out.)
+
+   By extending the single DUT test model, reasonable benchmarks
+   regarding multiple DUTs or heterogeneous environments may be
+   collected. In this extension, the single DUT is replaced by a system
+   of interconnected network DUTs. This test methodology would support
+   the benchmarking of a variety of device/media/service/protocol
+   combinations. For example, a configuration for a LAN-to-WAN-to-LAN
+   test might be:
+
+   (1) 802.3-> DUT 1 -> X.25 @ 64kbps -> DUT 2 -> 802.3
+
+   Or a mixed LAN configuration might be:
+
+   (2) 802.3 -> DUT 1 -> FDDI -> DUT 2 -> FDDI -> DUT 3 -> 802.3
+
+   In both examples 1 and 2, end-to-end benchmarks of each system could
+   be empirically ascertained. Other behavior may be characterized
+   through the use of intermediate devices. In example 2, the
+   configuration may be used to give an indication of the FDDI to FDDI
+   capability exhibited by DUT 2.
+
+   Because multiple DUTs are treated as a single system, there are
+   limitations to this methodology. For instance, this methodology may
+   yield an aggregate benchmark for a tested system. That benchmark
+   alone, however, may not necessarily reflect asymmetries in behavior
+   between the DUTs, latencies introduce by other apparatus (e.g.,
+   CSUs/DSUs, switches), etc.
+
+   Further, care must be used when comparing benchmarks of different
+   systems by ensuring that the DUTs' features/configuration of the
+   tested systems have the appropriate common denominators to allow
+   comparison.
+
+20. Maximum frame rate
+
+   The maximum frame rates that should be used when testing LAN
+   connections SHOULD be the listed theoretical maximum rate for the
+   frame size on the media.
+
+
+
+
+
+
+
+
+Bradner & McQuaid            Informational                     [Page 13]
+
+RFC 2544                Benchmarking Methodology              March 1999
+
+
+   The maximum frame rate that should be used when testing WAN
+   connections SHOULD be greater than the listed theoretical maximum
+   rate for the frame size on that speed connection.  The higher rate
+   for WAN tests is to compensate for the fact that some vendors employ
+   various forms of header compression.
+
+   A list of maximum frame rates for LAN connections is included in
+   Appendix B.
+
+21. Bursty traffic
+
+   It is convenient to measure the DUT performance under steady state
+   load but this is an unrealistic way to gauge the functioning of a DUT
+   since actual network traffic normally consists of bursts of frames.
+   Some of the tests described below SHOULD be performed with both
+   steady state traffic and with traffic consisting of repeated bursts
+   of frames.  The frames within a burst are transmitted with the
+   minimum legitimate inter-frame gap.
+
+   The objective of the test is to determine the minimum interval
+   between bursts which the DUT can process with no frame loss. During
+   each test the number of frames in each burst is held constant and the
+   inter-burst interval varied.  Tests SHOULD be run with burst sizes of
+   16, 64, 256 and 1024 frames.
+
+22. Frames per token
+
+   Although it is possible to configure some token ring and FDDI
+   interfaces to transmit more than one frame each time that the token
+   is received, most of the network devices currently available transmit
+   only one frame per token.  These tests SHOULD first be performed
+   while transmitting only one frame per token.
+
+   Some current high-performance workstation servers do transmit more
+   than one frame per token on FDDI to maximize throughput.  Since this
+   may be a common feature in future workstations and servers,
+   interconnect devices with FDDI interfaces SHOULD be tested with 1, 4,
+   8, and 16 frames per token.  The reported frame rate SHOULD be the
+   average rate of frame transmission over the total trial period.
