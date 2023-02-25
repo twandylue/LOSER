@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read, path::Path};
 
-type Error = Box<dyn std::error::Error>;
+type Error = std::io::Error;
 
 pub trait Reader {
     fn read_text(file_path: &Path) -> Result<String, Error>;
