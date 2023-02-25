@@ -3,7 +3,7 @@ use reader::plain_text_reader::{PlainTextReader, Reader};
 use serde_json;
 use std::{
     collections::HashMap,
-    env,
+    env, fs,
     path::{Path, PathBuf},
     process::ExitCode,
 };
@@ -33,14 +33,14 @@ fn entry() -> Result<(), ()> {
     }
 
     let subcommand = subcommand.ok_or_else(|| {
-        promp_usage(&program);
+        prompt_usage(&program);
         eprintln!("ERROR: no subcommand is provided.");
     })?;
 
     match subcommand.as_str() {
         "index" => {
             let dir_path = args.next().ok_or_else(|| {
-                promp_usage(&program);
+                prompt_usage(&program);
                 eprintln!("ERROR: no directory is provided for {subcommand} subcommand.");
             })?;
 
@@ -48,7 +48,7 @@ fn entry() -> Result<(), ()> {
 
             println!("Indexing...");
 
-            let dir = std::fs::read_dir(dir_path.as_str()).map_err(|err| {
+            let dir = fs::read_dir(dir_path.as_str()).map_err(|err| {
                 eprintln!("ERROR: could not open directory {dir_path} for indexing: {err}")
             })?;
 
@@ -68,7 +68,7 @@ fn entry() -> Result<(), ()> {
             })?;
 
             let index_path = "./src/index.json";
-            std::fs::write(index_path, output).map_err(|err| {
+            fs::write(index_path, output).map_err(|err| {
                 eprintln!(
                     "ERROR: could not write down serialized Index HashMap into the file: {index_path} when indexing: {err}"
                 )
@@ -78,7 +78,7 @@ fn entry() -> Result<(), ()> {
             todo!();
         }
         _ => {
-            promp_usage(&program);
+            prompt_usage(&program);
             eprintln!("ERROR: unknown subcommand {subcommand}.");
         }
     }
@@ -122,7 +122,7 @@ fn create_tf(content: String) -> TermFreq {
     counter
 }
 
-fn promp_usage(program: &str) {
+fn prompt_usage(program: &str) {
     eprintln!("Usage: {program} [SUBCOMMAND] [OPTIONS]");
     eprintln!("Subcommands and options:");
     eprintln!("     index <folder>                    index the <folder> and save the index to index.json file.");
