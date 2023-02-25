@@ -1,18 +1,11 @@
-use lexer::Lexer;
+use model::in_memory_index_model::{InMemoryIndexModel, Model};
 use reader::plain_text_reader::{PlainTextReader, Reader};
 use serde_json;
-use std::{
-    collections::HashMap,
-    env, fs,
-    path::{Path, PathBuf},
-    process::ExitCode,
-};
+use std::{env, fs, path::Path, process::ExitCode};
 
 mod lexer;
+mod model;
 mod reader;
-
-type TermFreq = HashMap<String, usize>;
-type FileTF = HashMap<PathBuf, TermFreq>;
 
 fn main() -> ExitCode {
     match entry() {
@@ -44,26 +37,25 @@ fn entry() -> Result<(), ()> {
                 eprintln!("ERROR: no directory is provided for {subcommand} subcommand.");
             })?;
 
-            let mut file_tf = FileTF::new();
-
             println!("Indexing...");
 
             let dir = fs::read_dir(dir_path.as_str()).map_err(|err| {
                 eprintln!("ERROR: could not open directory {dir_path} for indexing: {err}")
             })?;
 
+            let mut model = InMemoryIndexModel::new();
+
             for path in dir {
                 let file_path = path.map_err(|err| {
                     eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}");
                 })?.path();
                 println!("File: {file_path:?}");
-                let result = read_from_file(&file_path)?;
-                let tf = create_tf(result);
+                let content = read_from_file(&file_path)?;
 
-                file_tf.insert(file_path.to_path_buf(), tf);
+                model.add_document(file_path, &content.chars().collect::<Vec<char>>())?;
             }
 
-            let output = serde_json::to_string(&file_tf).map_err(|err| {
+            let output = serde_json::to_string(&model).map_err(|err| {
                 eprintln!("ERROR: could not serialize the Index HashMap when indexing: {err}")
             })?;
 
@@ -107,19 +99,6 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
             Err(())
         }
     }
-}
-
-fn create_tf(content: String) -> TermFreq {
-    let chars = &content.chars().collect::<Vec<char>>();
-    let lexer = Lexer::new(chars);
-
-    let mut counter = TermFreq::new();
-
-    lexer.for_each(|x| {
-        counter.entry(x).and_modify(|c| *c += 1).or_insert(1);
-    });
-
-    counter
 }
 
 fn prompt_usage(program: &str) {
