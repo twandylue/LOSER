@@ -50,9 +50,12 @@ fn entry() -> Result<(), ()> {
                     eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}");
                 })?.path();
                 println!("File: {file_path:?}");
-                let content = read_from_file(&file_path)?;
-
-                model.add_document(file_path, &content.chars().collect::<Vec<char>>())?;
+                match read_from_file(&file_path) {
+                    Ok(content) => {
+                        model.add_document(file_path, &content.chars().collect::<Vec<char>>())?;
+                    }
+                    Err(()) => continue,
+                }
             }
 
             let output = serde_json::to_string(&model).map_err(|err| {
