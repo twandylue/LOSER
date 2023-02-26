@@ -1,5 +1,6 @@
 use model::in_memory_index_model::{InMemoryIndexModel, Model};
 use reader::plain_text_reader::{PlainTextReader, Reader};
+use serde::Deserialize;
 use serde_json;
 use std::{env, fs, path::Path, process::ExitCode};
 
@@ -70,7 +71,34 @@ fn entry() -> Result<(), ()> {
             })?;
         }
         "search" => {
-            todo!();
+            let index_path = args.next().ok_or_else(|| {
+                prompt_usage(&program);
+                eprintln!("ERROR: no path to index is provided {subcommand} subcommand.");
+            })?;
+
+            let query = args
+                .next()
+                .ok_or_else(|| {
+                    prompt_usage(&program);
+                    eprintln!("ERROR: no search query is provided {subcommand} subcommand.");
+                })?
+                .chars()
+                .collect::<Vec<char>>();
+
+            let index_file = fs::File::open(&index_path).map_err(|err| {
+                eprintln!("ERROR: could not open the index file {index_path}: {err}");
+            })?;
+
+            let mut data = serde_json::Deserializer::from_reader(index_file);
+            let model = InMemoryIndexModel::deserialize(&mut data).map_err(|err| {
+                eprintln!("ERROR: could not parse the index file {index_path}: {err}");
+            })?;
+
+            for (path, rank) in model.search(&query)?.iter().take(10) {
+                println!("File Path: {path} | Rank: {rank}", path = path.display());
+            }
+
+            return Ok(());
         }
         _ => {
             prompt_usage(&program);
