@@ -53,3 +53,43 @@ impl Model for InMemoryIndexModel {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{InMemoryIndexModel, Model};
+    use crate::model::in_memory_index_model::Doc;
+    use std::{collections::HashMap, path::PathBuf, str::FromStr};
+
+    #[test]
+    fn add_document_ok() -> Result<(), ()> {
+        // arrange
+        let mut model = InMemoryIndexModel::new();
+        let path: PathBuf = PathBuf::from_str("test/test.txt")
+            .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
+        let content = String::from("Andy is Andy.");
+
+        let mut expected = InMemoryIndexModel::new();
+        let expected_doc = Doc {
+            tf: HashMap::from([
+                ("ANDY".to_string(), 2),
+                ("IS".to_string(), 1),
+                (".".to_string(), 1),
+            ]),
+            count: 4,
+        };
+        expected.docs.insert(path.clone(), expected_doc);
+        expected.df = HashMap::from([
+            ("ANDY".to_string(), 1),
+            ("IS".to_string(), 1),
+            (".".to_string(), 1),
+        ]);
+
+        // act
+        model.add_document(path.clone(), &content.chars().collect::<Vec<char>>())?;
+
+        // assert
+        assert_eq!(model, expected);
+
+        Ok(())
+    }
+}
