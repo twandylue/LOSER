@@ -47,25 +47,8 @@ fn entry() -> Result<(), ()> {
 
             println!("Indexing...");
 
-            let dir = fs::read_dir(dir_path.as_str()).map_err(|err| {
-                eprintln!("ERROR: could not open directory {dir_path} for indexing: {err}")
-            })?;
-
             let mut model = InMemoryIndexModel::new();
-
-            for path in dir {
-                let file_path = path.map_err(|err| {
-                    eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}");
-                })?.path();
-                println!("File: {file_path:?}");
-                match read_from_file(&file_path) {
-                    Ok(content) => {
-                        model.add_document(file_path, &content.chars().collect::<Vec<char>>())?;
-                    }
-                    Err(()) => continue,
-                }
-            }
-
+            add_folder_to_model(dir_path, &mut model)?;
             let output = serde_json::to_string(&model).map_err(|err| {
                 eprintln!("ERROR: could not serialize the Index HashMap when indexing: {err}")
             })?;
@@ -133,10 +116,37 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
             return Ok(r);
         }
         _ => {
-            eprintln!("The file type: {extension} is not be supported yet.");
+            eprintln!("The file type: {extension} has not been supported yet.");
             Err(())
         }
     }
+}
+
+fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Result<(), ()> {
+    let dir = fs::read_dir(dir_path.as_str()).map_err(|err| {
+        eprintln!("ERROR: could not open directory {dir_path} for indexing: {err}")
+    })?;
+
+    for path in dir {
+        let file_path = path.map_err(|err| {
+            eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}"); 
+        })?.path();
+
+        println!("File: {file_path:?}");
+
+        if file_path.is_dir() {
+            add_folder_to_model(file_path.to_string_lossy().to_string(), model)?
+        } else {
+            match read_from_file(&file_path) {
+                Ok(content) => {
+                    model.add_document(file_path, &content.chars().collect::<Vec<char>>())?;
+                }
+                Err(()) => continue,
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn prompt_usage(program: &str) {
