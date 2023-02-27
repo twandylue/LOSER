@@ -2,7 +2,11 @@ use model::in_memory_index_model::{InMemoryIndexModel, Model};
 use reader::plain_text_reader::{PlainTextReader, Reader};
 use serde::Deserialize;
 use serde_json;
-use std::{env, fs, path::Path, process::ExitCode};
+use std::{
+    env, fs,
+    path::Path,
+    process::{exit, ExitCode},
+};
 
 mod lexer;
 mod model;
@@ -21,7 +25,10 @@ fn entry() -> Result<(), ()> {
     let mut subcommand: Option<String> = None;
     if let Some(arg) = args.next() {
         match arg.as_str() {
-            "help" | "h" => todo!("help information"),
+            "help" | "h" => {
+                prompt_usage(&program);
+                exit(0);
+            }
             _ => subcommand = Some(arg),
         }
     }
