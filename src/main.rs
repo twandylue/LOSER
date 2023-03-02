@@ -97,7 +97,7 @@ fn entry() -> Result<(), ()> {
                 eprintln!("ERROR: could not build up the server at {port}: {err}");
             })?;
 
-            for request in server.incoming_requests() {
+            for mut request in server.incoming_requests() {
                 let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8")
                     .expect("Response header should not be empty.");
 
@@ -122,6 +122,55 @@ fn entry() -> Result<(), ()> {
                             .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
 
                         let response = Response::from_file(response_content).with_header(header);
+                        request.respond(response).map_err(|err| {
+                            eprintln!("ERROR: could not respond the message: {err}")
+                        })?;
+                    }
+                    (Method::Post, "/api/search") => {
+                        let mut query = String::new();
+                        request
+                            .as_reader()
+                            .read_to_string(&mut query)
+                            .map_err(|err| {
+                                eprintln!("ERROR: could not read the post body: {err}")
+                            })?;
+
+                        println!("Request body(query): {query}");
+
+                        let index_file = fs::File::open("index.json").map_err(|err| {
+                            eprintln!("ERROR: could not open the index file index.json: {err}");
+                        })?;
+
+                        let mut data = serde_json::Deserializer::from_reader(index_file);
+                        let model = InMemoryIndexModel::deserialize(&mut data).map_err(|err| {
+                            eprintln!("ERROR: could not parse the index file index.json: {err}");
+                        })?;
+
+                        let mut data = Vec::<(String, f32)>::new();
+
+                        for (path, rank) in model
+                            .search(&query.chars().collect::<Vec<char>>())?
+                            .iter()
+                            .take(10)
+                        {
+                            println!("File Path: {path} | Rank: {rank}", path = path.display());
+
+                            data.push((format!("{path}", path = path.display()), *rank));
+                        }
+
+                        let header = Header::from_bytes("Content-Type", "application/json")
+                            .expect("Response header should not be empty.");
+
+                        let response_content = serde_json::to_string(&data).map_err(|err| {
+                            eprintln!(
+                                "ERROR: could not serialize the response data: {data:?}: {err}"
+                            )
+                        })?;
+
+                        let response = Response::from_string(response_content)
+                            .with_header(header)
+                            .with_status_code(tiny_http::StatusCode(200));
+
                         request.respond(response).map_err(|err| {
                             eprintln!("ERROR: could not respond the message: {err}")
                         })?;
