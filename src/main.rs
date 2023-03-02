@@ -53,7 +53,7 @@ fn entry() -> Result<(), ()> {
                 eprintln!("ERROR: could not serialize the Index HashMap when indexing: {err}")
             })?;
 
-            let index_path = "./src/index.json";
+            let index_path = "index.json";
             fs::write(index_path, output).map_err(|err| {
                 eprintln!(
                     "ERROR: could not write down serialized Index HashMap into the file: {index_path} when indexing: {err}"

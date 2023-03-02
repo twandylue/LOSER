@@ -19,7 +19,7 @@ Subcommands and options:
 ```
 
 Create the index for a folder
-> The `index.json` file would be under `./src/`
+> You can find the `index.json` under the root directory of LOSER.
 
 ```console
 $ cargo run -- index ./src/data
