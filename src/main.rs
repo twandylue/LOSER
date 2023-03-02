@@ -6,7 +6,9 @@ use std::{
     env, fs,
     path::Path,
     process::{exit, ExitCode},
+    str::FromStr,
 };
+use tiny_http::{Header, Response, Server};
 
 mod lexer;
 mod model;
@@ -89,6 +91,32 @@ fn entry() -> Result<(), ()> {
             }
 
             return Ok(());
+        }
+        "server" => {
+            let port = args.next().unwrap_or("8080".to_string());
+            let server = Server::http(format!("127.0.0.1:{port}")).map_err(|err| {
+                eprintln!("ERROR: could not build up the server at {port}: {err}");
+            })?;
+
+            for request in server.incoming_requests() {
+                // println!(
+                //     "received request! method: {method:#?}, url: {url:#?}, headers: {headers:#?}",
+                //     method = request.method(),
+                //     url = request.url(),
+                //     headers = request.headers()
+                // );
+
+                let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8")
+                    .expect("Response header should not be empty.");
+
+                let response_content = std::fs::File::open("index.html")
+                    .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
+
+                let response = Response::from_file(response_content).with_header(header);
+                request
+                    .respond(response)
+                    .map_err(|err| eprintln!("ERROR: could not respond the message: {err}"))?;
+            }
         }
         _ => {
             prompt_usage(&program);
