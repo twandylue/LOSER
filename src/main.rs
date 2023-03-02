@@ -6,9 +6,8 @@ use std::{
     env, fs,
     path::Path,
     process::{exit, ExitCode},
-    str::FromStr,
 };
-use tiny_http::{Header, Response, Server};
+use tiny_http::{Header, Method, Response, Server};
 
 mod lexer;
 mod model;
@@ -99,23 +98,38 @@ fn entry() -> Result<(), ()> {
             })?;
 
             for request in server.incoming_requests() {
-                // println!(
-                //     "received request! method: {method:#?}, url: {url:#?}, headers: {headers:#?}",
-                //     method = request.method(),
-                //     url = request.url(),
-                //     headers = request.headers()
-                // );
-
                 let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8")
                     .expect("Response header should not be empty.");
 
-                let response_content = std::fs::File::open("index.html")
-                    .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
+                println!(
+                    "method: {method:#?}, url: {url:#?}",
+                    method = request.method(),
+                    url = request.url(),
+                );
 
-                let response = Response::from_file(response_content).with_header(header);
-                request
-                    .respond(response)
-                    .map_err(|err| eprintln!("ERROR: could not respond the message: {err}"))?;
+                match (request.method(), request.url()) {
+                    (Method::Get, "/") => {
+                        let response_content = std::fs::File::open("index.html")
+                            .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
+
+                        let response = Response::from_file(response_content).with_header(header);
+                        request.respond(response).map_err(|err| {
+                            eprintln!("ERROR: could not respond the message: {err}")
+                        })?;
+                    }
+                    (Method::Get, "/index.js") => {
+                        let response_content = std::fs::File::open("index.js")
+                            .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
+
+                        let response = Response::from_file(response_content).with_header(header);
+                        request.respond(response).map_err(|err| {
+                            eprintln!("ERROR: could not respond the message: {err}")
+                        })?;
+                    }
+                    _ => {
+                        println!("Other url: {url}", url = request.url());
+                    }
+                };
             }
         }
         _ => {
