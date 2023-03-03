@@ -7,11 +7,12 @@ use std::{
     path::Path,
     process::{exit, ExitCode},
 };
-use tiny_http::{Header, Method, Response, Server};
+use web_server::WebServer;
 
 mod lexer;
 mod model;
 mod reader;
+mod web_server;
 
 fn main() -> ExitCode {
     match entry() {
@@ -93,93 +94,20 @@ fn entry() -> Result<(), ()> {
         }
         "server" => {
             let port = args.next().unwrap_or("8080".to_string());
-            let server = Server::http(format!("127.0.0.1:{port}")).map_err(|err| {
-                eprintln!("ERROR: could not build up the server at {port}: {err}");
+            let addr = format!("127.0.0.1:{port}");
+
+            let index_file = fs::File::open("index.json").map_err(|err| {
+                eprintln!("ERROR: could not open the index file index.json: {err}");
             })?;
 
-            for mut request in server.incoming_requests() {
-                let header = Header::from_bytes("Content-Type", "text/html; charset=utf-8")
-                    .expect("Response header should not be empty.");
+            let mut data = serde_json::Deserializer::from_reader(index_file);
+            let model = InMemoryIndexModel::deserialize(&mut data).map_err(|err| {
+                eprintln!("ERROR: could not parse the index file index.json: {err}");
+            })?;
 
-                println!(
-                    "method: {method:#?}, url: {url:#?}",
-                    method = request.method(),
-                    url = request.url(),
-                );
+            let server = WebServer::new(addr.as_str(), Box::new(model));
 
-                match (request.method(), request.url()) {
-                    (Method::Get, "/") => {
-                        let response_content = std::fs::File::open("index.html")
-                            .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
-
-                        let response = Response::from_file(response_content).with_header(header);
-                        request.respond(response).map_err(|err| {
-                            eprintln!("ERROR: could not respond the message: {err}")
-                        })?;
-                    }
-                    (Method::Get, "/index.js") => {
-                        let response_content = std::fs::File::open("index.js")
-                            .map_err(|err| eprintln!("ERROR: could not find the file: {err}"))?;
-
-                        let response = Response::from_file(response_content).with_header(header);
-                        request.respond(response).map_err(|err| {
-                            eprintln!("ERROR: could not respond the message: {err}")
-                        })?;
-                    }
-                    (Method::Post, "/api/search") => {
-                        let mut query = String::new();
-                        request
-                            .as_reader()
-                            .read_to_string(&mut query)
-                            .map_err(|err| {
-                                eprintln!("ERROR: could not read the post body: {err}")
-                            })?;
-
-                        println!("Request body(query): {query}");
-
-                        let index_file = fs::File::open("index.json").map_err(|err| {
-                            eprintln!("ERROR: could not open the index file index.json: {err}");
-                        })?;
-
-                        let mut data = serde_json::Deserializer::from_reader(index_file);
-                        let model = InMemoryIndexModel::deserialize(&mut data).map_err(|err| {
-                            eprintln!("ERROR: could not parse the index file index.json: {err}");
-                        })?;
-
-                        let mut data = Vec::<(String, f32)>::new();
-
-                        for (path, rank) in model
-                            .search(&query.chars().collect::<Vec<char>>())?
-                            .iter()
-                            .take(10)
-                        {
-                            println!("File Path: {path} | Rank: {rank}", path = path.display());
-
-                            data.push((format!("{path}", path = path.display()), *rank));
-                        }
-
-                        let header = Header::from_bytes("Content-Type", "application/json")
-                            .expect("Response header should not be empty.");
-
-                        let response_content = serde_json::to_string(&data).map_err(|err| {
-                            eprintln!(
-                                "ERROR: could not serialize the response data: {data:?}: {err}"
-                            )
-                        })?;
-
-                        let response = Response::from_string(response_content)
-                            .with_header(header)
-                            .with_status_code(tiny_http::StatusCode(200));
-
-                        request.respond(response).map_err(|err| {
-                            eprintln!("ERROR: could not respond the message: {err}")
-                        })?;
-                    }
-                    _ => {
-                        println!("Other url: {url}", url = request.url());
-                    }
-                };
-            }
+            server.start()?;
         }
         _ => {
             prompt_usage(&program);
