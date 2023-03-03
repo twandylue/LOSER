@@ -100,8 +100,7 @@ fn entry() -> Result<(), ()> {
                 eprintln!("ERROR: could not open the index file index.json: {err}");
             })?;
 
-            let mut data = serde_json::Deserializer::from_reader(index_file);
-            let model = InMemoryIndexModel::deserialize(&mut data).map_err(|err| {
+            let model: InMemoryIndexModel = serde_json::from_reader(index_file).map_err(|err| {
                 eprintln!("ERROR: could not parse the index file index.json: {err}");
             })?;
 
