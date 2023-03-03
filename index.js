@@ -1,17 +1,25 @@
-console.log("Hello World!")
-
-async function search(prompt) {
-  // TODO:
-  // const results = document.getElementById("results");
-  // results.innerHTML = "";
+async function search(query) {
+  const results = document.getElementById("results");
+  results.innerHTML = "";
   const response = await fetch("/api/search", {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
-    body: prompt,
+    body: query,
   })
   const json = await response.json();
-
-  console.log(json);
+  for ([path, rank] of json) {
+    let item = document.createElement("span");
+    item.appendChild(document.createTextNode(path));
+    item.appendChild(document.createTextNode(" | "));
+    item.appendChild(document.createTextNode("rank: " + rank));
+    item.appendChild(document.createElement("br"));
+    results.appendChild(item)
+  }
 }
 
-search("github")
+let query = document.getElementById("query");
+query.addEventListener("keypress", async (e) => {
+  if (e.key == "Enter") {
+    await search(query.value)
+  }
+})
