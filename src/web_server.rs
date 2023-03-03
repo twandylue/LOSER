@@ -45,7 +45,7 @@ impl<'a> WebServer<'a> {
         Ok(())
     }
 
-    fn serve_search(mut request: Request, model: &Box<dyn Model>) -> std::io::Result<()> {
+    fn serve_search(&self, mut request: Request) -> std::io::Result<()> {
         let mut query = String::new();
         if let Err(err) = request.as_reader().read_to_string(&mut query) {
             eprintln!("ERROR: could not read the body of the request: {err}");
@@ -54,7 +54,7 @@ impl<'a> WebServer<'a> {
 
         println!("Request body(query): {query}");
 
-        let results = match model.search(&query.chars().collect::<Vec<char>>()) {
+        let results = match self.model.search(&query.chars().collect::<Vec<char>>()) {
             Ok(result) => result,
             Err(_) => return Self::serve_500(request),
         };
@@ -86,7 +86,7 @@ impl<'a> WebServer<'a> {
         Ok(())
     }
 
-    fn serve_request(model: &Box<dyn Model>, request: Request) -> io::Result<()> {
+    fn serve_request(&self, request: Request) -> io::Result<()> {
         println!(
             "INFO: received request! method: {method}, url: {url}",
             method = request.method(),
@@ -101,7 +101,7 @@ impl<'a> WebServer<'a> {
                 Self::serve_static_file(request, "index.js", "text/javascript; charset=utf-8")?;
             }
             (Method::Post, "/api/search") => {
-                Self::serve_search(request, model)?;
+                self.serve_search(request)?;
             }
             _ => {
                 println!("Other url: {url}", url = request.url());
@@ -128,7 +128,7 @@ impl<'a> WebServer<'a> {
                 url = request.url(),
             );
 
-            Self::serve_request(&self.model, request)
+            self.serve_request(request)
                 .map_err(|err| eprintln!("ERROR: could not serve the response: {err}"))
                 .ok(); // do not stop on errors, keep going
         }
