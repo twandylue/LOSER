@@ -4,6 +4,7 @@ use serde::Deserialize;
 use serde_json;
 use std::{
     env, fs,
+    io::BufWriter,
     path::Path,
     process::{exit, ExitCode},
 };
@@ -51,15 +52,13 @@ fn entry() -> Result<(), ()> {
 
             let mut model = InMemoryIndexModel::new();
             add_folder_to_model(dir_path, &mut model)?;
-            let output = serde_json::to_string(&model).map_err(|err| {
-                eprintln!("ERROR: could not serialize the Index HashMap when indexing: {err}")
+
+            let index_file = fs::File::create("index.json").map_err(|err| {
+                eprintln!("ERROR: could not create the index file: {err}");
             })?;
 
-            let index_path = "index.json";
-            fs::write(index_path, output).map_err(|err| {
-                eprintln!(
-                    "ERROR: could not write down serialized Index HashMap into the file: {index_path} when indexing: {err}"
-                )
+            serde_json::to_writer(BufWriter::new(index_file), &model).map_err(|err| {
+                eprintln!("ERROR: could not serialize index into the index file: {err}")
             })?;
         }
         "search" => {
@@ -126,13 +125,7 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
         .to_string_lossy();
 
     match extension.as_ref() {
-        "txt" => {
-            let r = PlainTextReader::read_text(file_path).map_err(|err| {
-                eprintln!("ERROR: could not open the file when indexing: {err}");
-            })?;
-
-            return Ok(r);
-        }
+        "txt" => PlainTextReader::read_text(file_path),
         _ => {
             eprintln!("The file type: {extension} has not been supported yet.");
             Err(())

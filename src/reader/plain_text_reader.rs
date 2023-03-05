@@ -1,19 +1,14 @@
-use std::{fs::File, io::Read, path::Path};
-
-type Error = std::io::Error;
+use std::{fs, path::Path};
 
 pub trait Reader {
-    fn read_text(file_path: &Path) -> Result<String, Error>;
+    fn read_text(file_path: &Path) -> Result<String, ()>;
 }
 
 pub struct PlainTextReader {}
 
 impl Reader for PlainTextReader {
-    fn read_text(file_path: &Path) -> Result<String, Error> {
-        let mut buf = String::new();
-        let mut file = File::open(file_path)?;
-        file.read_to_string(&mut buf)?;
-
-        Ok(buf)
+    fn read_text(file_path: &Path) -> Result<String, ()> {
+        fs::read_to_string(file_path)
+            .map_err(|err| eprintln!("ERROR: could not open the file {file_path:?}: {err}"))
     }
 }
