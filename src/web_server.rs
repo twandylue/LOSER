@@ -100,6 +100,9 @@ impl<'a> WebServer<'a> {
             (Method::Get, "/index.js") => {
                 Self::serve_static_file(request, "index.js", "text/javascript; charset=utf-8")?;
             }
+            (Method::Get, "/img/rust.png") => {
+                Self::serve_static_file(request, "./img/rust.png", "image/png")?;
+            }
             (Method::Post, "/api/search") => {
                 self.serve_search(request)?;
             }
