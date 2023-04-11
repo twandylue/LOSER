@@ -7,6 +7,7 @@ use std::{
     io::BufWriter,
     path::Path,
     process::{exit, ExitCode},
+    sync::{Arc, Mutex},
 };
 use web_server::WebServer;
 
@@ -71,7 +72,7 @@ fn entry() -> Result<(), ()> {
                 .next()
                 .ok_or_else(|| {
                     prompt_usage(&program);
-                    eprintln!("ERROR: no search query is provided {subcommand} subcommand.");
+                    eprintln!("ERROR: no search query is provided for {subcommand} subcommand.");
                 })?
                 .chars()
                 .collect::<Vec<char>>();
@@ -92,18 +93,50 @@ fn entry() -> Result<(), ()> {
             return Ok(());
         }
         "server" => {
+            let file_path = args.next().ok_or_else(|| {
+                prompt_usage(&program);
+                eprintln!("ERROR: no folder is provided for {subcommand} subcommand.")
+            })?;
+
+            let mut index_path = Path::new(&file_path).to_path_buf();
+            index_path.push(".loser.json");
+
             let port = args.next().unwrap_or("8080".to_string());
             let addr = format!("127.0.0.1:{port}");
 
-            let index_file = fs::File::open("index.json").map_err(|err| {
-                eprintln!("ERROR: could not open the index file index.json: {err}");
+            // TODO: should be an error?
+            let is_existed = index_path.as_path().try_exists().map_err(|err| {
+                eprintln!(
+                    "ERROR: could not check the existence of file {index_path}: {err}",
+                    index_path = index_path.display()
+                )
             })?;
 
-            let model: InMemoryIndexModel = serde_json::from_reader(index_file).map_err(|err| {
-                eprintln!("ERROR: could not parse the index file index.json: {err}");
-            })?;
+            let model: Arc<Mutex<dyn Model>>;
 
-            let server = WebServer::new(addr.as_str(), Box::new(model));
+            if is_existed {
+                let index_file = fs::File::open(&index_path).map_err(|err| {
+                    eprintln!(
+                        "ERROR: could not open the index file {index_path}: {err}",
+                        index_path = index_path.display()
+                    )
+                })?;
+
+                model = Arc::new(Mutex::<InMemoryIndexModel>::new(
+                    serde_json::from_reader(&index_file).map_err(|err| {
+                        eprintln!(
+                            "ERROR: could not parse the index file {index_path}: {err}",
+                            index_path = index_path.display()
+                        )
+                    })?,
+                ));
+            } else {
+                model = Arc::new(Mutex::<InMemoryIndexModel>::new(Default::default()));
+            }
+
+            // TODO: add a background service for indexing files
+
+            let server = WebServer::new(addr.as_str(), model);
 
             server.start()?;
         }
@@ -185,4 +218,5 @@ fn prompt_usage(program: &str) {
     eprintln!("Subcommands and options:");
     eprintln!("     index <folder>                    index the <folder> and save the index to index.json file.");
     eprintln!("     search <index-file> <query>       search <query> within the <index-file>");
+    eprintln!("     server <folder> [port]            search on local HTTP server within files in <folder>");
 }

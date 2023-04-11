@@ -1,14 +1,17 @@
 use super::model::in_memory_index_model::Model;
-use std::io;
+use std::{
+    io,
+    sync::{Arc, Mutex},
+};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 pub struct WebServer<'a> {
     pub addr: &'a str,
-    pub model: Box<dyn Model>,
+    pub model: Arc<Mutex<dyn Model>>,
 }
 
 impl<'a> WebServer<'a> {
-    pub fn new(addr: &'a str, model: Box<dyn Model>) -> Self {
+    pub fn new(addr: &'a str, model: Arc<Mutex<dyn Model>>) -> Self {
         WebServer { addr, model }
     }
 
@@ -54,7 +57,12 @@ impl<'a> WebServer<'a> {
 
         println!("Request body(query): {query}");
 
-        let results = match self.model.search(&query.chars().collect::<Vec<char>>()) {
+        let results = match self
+            .model
+            .lock()
+            .unwrap()
+            .search(&query.chars().collect::<Vec<char>>())
+        {
             Ok(result) => result,
             Err(_) => return Self::serve_500(request),
         };
