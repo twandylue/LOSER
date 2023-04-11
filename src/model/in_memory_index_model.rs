@@ -1,10 +1,20 @@
 use super::super::lexer::Lexer;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, time::SystemTime};
 
 pub trait Model {
-    fn add_document(&mut self, file_path: PathBuf, content: &[char]) -> Result<(), ()>;
+    fn add_document(
+        &mut self,
+        file_path: PathBuf,
+        content: &[char],
+        last_modified: SystemTime,
+    ) -> Result<(), ()>;
+
+    fn remove_document(&mut self, file_path: &PathBuf);
+
     fn search(&self, query: &[char]) -> Result<Vec<(PathBuf, f32)>, ()>;
+
+    fn requires_reindexing(&self, file_path: &PathBuf, last_modified: SystemTime) -> bool;
 }
 
 type TermFreq = HashMap<String, usize>;
@@ -15,6 +25,7 @@ type DocFreq = HashMap<String, usize>;
 pub struct Doc {
     tf: TermFreq,
     count: usize, // NOTE: Total tokens
+    last_modified: SystemTime,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -59,7 +70,12 @@ impl Model for InMemoryIndexModel {
         Ok(result)
     }
 
-    fn add_document(&mut self, file_path: PathBuf, content: &[char]) -> Result<(), ()> {
+    fn add_document(
+        &mut self,
+        file_path: PathBuf,
+        content: &[char],
+        last_modified: SystemTime,
+    ) -> Result<(), ()> {
         let mut tf = TermFreq::new();
         let mut count = 0;
 
@@ -75,9 +91,32 @@ impl Model for InMemoryIndexModel {
                 .or_insert(1);
         }
 
-        let doc = Doc { tf, count };
+        let doc = Doc {
+            tf,
+            count,
+            last_modified,
+        };
         self.docs.insert(file_path, doc);
+
         Ok(())
+    }
+
+    fn requires_reindexing(&self, file_path: &PathBuf, last_modified: SystemTime) -> bool {
+        if let Some(doc) = self.docs.get(file_path) {
+            return doc.last_modified < last_modified;
+        }
+
+        return true;
+    }
+
+    fn remove_document(&mut self, file_path: &PathBuf) {
+        if let Some(doc) = self.docs.remove(file_path) {
+            for t in doc.tf.keys() {
+                if let Some(f) = self.df.get_mut(t) {
+                    *f -= 1;
+                }
+            }
+        }
     }
 }
 
@@ -85,7 +124,13 @@ impl Model for InMemoryIndexModel {
 mod tests {
     use super::{InMemoryIndexModel, Model};
     use crate::model::in_memory_index_model::Doc;
-    use std::{collections::HashMap, path::PathBuf, str::FromStr};
+    use std::{
+        collections::HashMap,
+        ops::Add,
+        path::PathBuf,
+        str::FromStr,
+        time::{Duration, SystemTime},
+    };
 
     #[test]
     fn add_document_ok() -> Result<(), ()> {
@@ -94,6 +139,7 @@ mod tests {
         let path: PathBuf = PathBuf::from_str("test/test.txt")
             .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
         let content = String::from("Andy is Andy.");
+        let time = SystemTime::now();
 
         let mut expected = InMemoryIndexModel::new();
         let expected_doc = Doc {
@@ -103,6 +149,7 @@ mod tests {
                 (".".to_string(), 1),
             ]),
             count: 4,
+            last_modified: time,
         };
         expected.docs.insert(path.clone(), expected_doc);
         expected.df = HashMap::from([
@@ -112,7 +159,7 @@ mod tests {
         ]);
 
         // act
-        model.add_document(path.clone(), &content.chars().collect::<Vec<char>>())?;
+        model.add_document(path.clone(), &content.chars().collect::<Vec<char>>(), time)?;
 
         // assert
         assert_eq!(model, expected);
@@ -127,11 +174,19 @@ mod tests {
         let path1: PathBuf = PathBuf::from_str("test/test.txt")
             .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
         let content1 = String::from("Andy is Andy.");
-        model.add_document(path1.clone(), &content1.chars().collect::<Vec<char>>())?;
+        model.add_document(
+            path1.clone(),
+            &content1.chars().collect::<Vec<char>>(),
+            SystemTime::now(),
+        )?;
         let path2: PathBuf = PathBuf::from_str("test/test2.txt")
             .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
         let content2 = String::from("Amy is Amy.");
-        model.add_document(path2.clone(), &content2.chars().collect::<Vec<char>>())?;
+        model.add_document(
+            path2.clone(),
+            &content2.chars().collect::<Vec<char>>(),
+            SystemTime::now(),
+        )?;
 
         let value1 = 0.5_f32 * (2_f32 / 1_f32).log10(); // tf * idf
         let expected = vec![(path1.clone(), value1), (path2.clone(), 0_f32)];
@@ -142,6 +197,80 @@ mod tests {
 
         // assert
         assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
+    #[test]
+    fn requires_reindexing_ok() -> Result<(), ()> {
+        // arrange
+        let mut model = InMemoryIndexModel::new();
+        let file_path: PathBuf = PathBuf::from_str("test/test.txt")
+            .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
+        let content = String::from("Andy is Andy.");
+        let time = SystemTime::now();
+
+        model.add_document(
+            file_path.clone(),
+            &content.chars().collect::<Vec<char>>(),
+            time,
+        )?;
+
+        // act
+        let actual = model.requires_reindexing(&file_path, time.add(Duration::from_secs(10)));
+
+        // assert
+        assert!(actual);
+
+        Ok(())
+    }
+
+    #[test]
+    fn remove_document_ok() -> Result<(), ()> {
+        // arrange
+        let mut model = InMemoryIndexModel::new();
+        let file_path1: PathBuf = PathBuf::from_str("test/test1.txt")
+            .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
+        let content1 = String::from("Andy is Andy.");
+        let file_path2: PathBuf = PathBuf::from_str("test/test2.txt")
+            .map_err(|err| eprintln!("ERROR: the path is not valid in test: {err}"))?;
+        let content2 = String::from("Amy is Amy.");
+        let time = SystemTime::now();
+
+        model.add_document(
+            file_path1.clone(),
+            &content1.chars().collect::<Vec<char>>(),
+            time,
+        )?;
+
+        model.add_document(
+            file_path2.clone(),
+            &content2.chars().collect::<Vec<char>>(),
+            time,
+        )?;
+
+        // act && assert
+        assert_eq!(model.docs.keys().count(), 2);
+        assert_eq!(
+            model.df.get("ANDY").and_then(|count| Some(*count as i32)),
+            Some(1)
+        );
+        assert_eq!(
+            model.df.get("IS").and_then(|count| Some(*count as i32)),
+            Some(2)
+        );
+
+        model.remove_document(&file_path1);
+
+        assert_eq!(model.docs.keys().count(), 1);
+        assert_eq!(
+            model.df.get("ANDY").and_then(|count| Some(*count as i32)),
+            Some(0)
+        );
+        assert_eq!(
+            model.df.get("IS").and_then(|count| Some(*count as i32)),
+            Some(1)
+        );
 
         Ok(())
     }

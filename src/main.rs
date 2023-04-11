@@ -143,14 +143,34 @@ fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Resu
             eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}"); 
         })?.path();
 
-        println!("File: {file_path:?}");
+        let last_modified = file_path
+            .metadata()
+            .map_err(|err| {
+                eprintln!(
+                    "ERROR: could not get the metadata of file {file_path}: {err}",
+                    file_path = file_path.display()
+                )
+            })?
+            .modified()
+            .map_err(|err| {
+                eprintln!(
+                    "ERROR: could not get the last modified time of file {file_path}: {err}",
+                    file_path = file_path.display()
+                )
+            })?;
 
         if file_path.is_dir() {
             add_folder_to_model(file_path.to_string_lossy().to_string(), model)?
-        } else {
+        } else if model.requires_reindexing(&file_path, last_modified) {
             match read_from_file(&file_path) {
                 Ok(content) => {
-                    model.add_document(file_path, &content.chars().collect::<Vec<char>>())?;
+                    println!("File: {file_path:?}");
+
+                    model.add_document(
+                        file_path,
+                        &content.chars().collect::<Vec<char>>(),
+                        last_modified,
+                    )?;
                 }
                 Err(()) => continue,
             }
