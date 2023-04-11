@@ -36,10 +36,19 @@ File Path: ./src/data/test1.txt | Rank: 0.0029716683
 File Path: ./src/data/test2.txt | Rank: 0
 ```
 
+Web Server
+
+```console
+$ cargo run -- server
+...
+```
+
+Then go to [http://127.0.0.1:8080/](http://127.0.0.1:8080/)
+
 ## TODOs
 
-- [ ] UI(Maybe a simple web server)
-- [ ] Database for index files
+- [x] UI(a simple web server)
+- [ ] Auto-indexing by folder(background service)
 
 ## References
 

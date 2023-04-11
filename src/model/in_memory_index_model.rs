@@ -14,13 +14,13 @@ type DocFreq = HashMap<String, usize>;
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Doc {
     tf: TermFreq,
-    count: usize,
+    count: usize, // NOTE: Total tokens
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Default, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct InMemoryIndexModel {
     pub docs: FileTF,
-    pub df: DocFreq,
+    pub df: DocFreq, // NOTE: Frequency of different tokens in different docs
 }
 
 impl InMemoryIndexModel {
