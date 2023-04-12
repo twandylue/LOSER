@@ -9,6 +9,7 @@ use std::{
     process::{exit, ExitCode},
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 use web_server::WebServer;
 
@@ -59,19 +60,12 @@ fn entry() -> Result<(), ()> {
                 folder_name = folder_name.to_string_lossy().to_string()
             );
 
-            let index_file = fs::File::create(&output_file_name).map_err(|err| {
-                eprintln!("ERROR: could not create the index file: {output_file_name}: {err}");
-            })?;
-
             println!("Indexing...");
 
             let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
             add_folder_to_model(&dir_path, Arc::clone(&model))?;
-
             let model: &InMemoryIndexModel = &model.lock().unwrap();
-            serde_json::to_writer(BufWriter::new(index_file), &model).map_err(|err| {
-                eprintln!("ERROR: could not serialize index into the index file: {err}")
-            })?;
+            save_mode_as_json(model, &Path::new(&output_file_name))?;
         }
         "search" => {
             let index_path = args.next().ok_or_else(|| {
@@ -104,25 +98,23 @@ fn entry() -> Result<(), ()> {
             return Ok(());
         }
         "server" => {
-            let file_path = args.next().ok_or_else(|| {
+            let dir_path = args.next().ok_or_else(|| {
                 prompt_usage(&program);
                 eprintln!("ERROR: no folder is provided for {subcommand} subcommand.")
             })?;
-
-            let mut index_path = Path::new(&file_path).to_path_buf();
-            index_path.push(".loser.json");
+            let index_path = Path::new(&format!("{dir_path}.loser.json")).to_path_buf();
 
             let port = args.next().unwrap_or("8080".to_string());
             let addr = format!("127.0.0.1:{port}");
 
-            // TODO: should be an error?
-            let is_existed = index_path.as_path().try_exists().map_err(|err| {
+            let is_existed = index_path.try_exists().map_err(|err| {
                 eprintln!(
                     "ERROR: could not check the existence of file {index_path}: {err}",
                     index_path = index_path.display()
                 )
             })?;
 
+            // TODO: how to make it more generic?
             let model: Arc<Mutex<InMemoryIndexModel>>;
 
             if is_existed {
@@ -145,16 +137,22 @@ fn entry() -> Result<(), ()> {
                 model = Arc::new(Mutex::<InMemoryIndexModel>::new(Default::default()));
             }
 
-            // TODO: add a background service for indexing files
             {
                 let model = Arc::clone(&model);
 
-                thread::spawn(move || {
-                    // let mut processed = 0;
-                    add_folder_to_model(
-                        &Path::new(&index_path).to_string_lossy().to_string(),
-                        Arc::clone(&model),
-                    )
+                thread::spawn(move || -> Result<(), ()> {
+                    loop {
+                        add_folder_to_model(
+                            &Path::new(&dir_path).to_string_lossy().to_string(),
+                            Arc::clone(&model),
+                        )?;
+                        let model = model.lock().unwrap();
+                        save_mode_as_json(&model, &index_path)?;
+
+                        println!("Finished indexing...");
+
+                        thread::sleep(Duration::from_secs(1));
+                    }
                 });
             }
 
@@ -235,6 +233,20 @@ fn add_folder_to_model(dir_path: &str, model: Arc<Mutex<InMemoryIndexModel>>) ->
             }
         }
     }
+
+    Ok(())
+}
+
+fn save_mode_as_json(model: &InMemoryIndexModel, file_path: &Path) -> Result<(), ()> {
+    let file = fs::File::create(file_path).map_err(|err| {
+        eprintln!(
+            "ERROR: could not create the index file: {file_path}: {err}",
+            file_path = file_path.display()
+        )
+    })?;
+
+    serde_json::to_writer(BufWriter::new(file), &model)
+        .map_err(|err| eprintln!("ERROR: could not serialize index into the index file: {err}"))?;
 
     Ok(())
 }
