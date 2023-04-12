@@ -8,6 +8,7 @@ use std::{
     path::Path,
     process::{exit, ExitCode},
     sync::{Arc, Mutex},
+    thread,
 };
 use web_server::WebServer;
 
@@ -49,15 +50,25 @@ fn entry() -> Result<(), ()> {
                 eprintln!("ERROR: no directory is provided for {subcommand} subcommand.");
             })?;
 
-            println!("Indexing...");
+            let folder_name = Path::new(&dir_path)
+                .file_name()
+                .ok_or_else(|| eprintln!("ERROR: could not extract the folder name: {dir_path}"))?;
 
-            let mut model = InMemoryIndexModel::new();
-            add_folder_to_model(dir_path, &mut model)?;
+            let output_file_name = format!(
+                "{folder_name}.loser.json",
+                folder_name = folder_name.to_string_lossy().to_string()
+            );
 
-            let index_file = fs::File::create("index.json").map_err(|err| {
-                eprintln!("ERROR: could not create the index file: {err}");
+            let index_file = fs::File::create(&output_file_name).map_err(|err| {
+                eprintln!("ERROR: could not create the index file: {output_file_name}: {err}");
             })?;
 
+            println!("Indexing...");
+
+            let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
+            add_folder_to_model(&dir_path, Arc::clone(&model))?;
+
+            let model: &InMemoryIndexModel = &model.lock().unwrap();
             serde_json::to_writer(BufWriter::new(index_file), &model).map_err(|err| {
                 eprintln!("ERROR: could not serialize index into the index file: {err}")
             })?;
@@ -112,7 +123,7 @@ fn entry() -> Result<(), ()> {
                 )
             })?;
 
-            let model: Arc<Mutex<dyn Model>>;
+            let model: Arc<Mutex<InMemoryIndexModel>>;
 
             if is_existed {
                 let index_file = fs::File::open(&index_path).map_err(|err| {
@@ -135,6 +146,17 @@ fn entry() -> Result<(), ()> {
             }
 
             // TODO: add a background service for indexing files
+            {
+                let model = Arc::clone(&model);
+
+                thread::spawn(move || {
+                    // let mut processed = 0;
+                    add_folder_to_model(
+                        &Path::new(&index_path).to_string_lossy().to_string(),
+                        Arc::clone(&model),
+                    )
+                });
+            }
 
             let server = WebServer::new(addr.as_str(), model);
 
@@ -166,8 +188,8 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
     }
 }
 
-fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Result<(), ()> {
-    let dir = fs::read_dir(dir_path.as_str()).map_err(|err| {
+fn add_folder_to_model(dir_path: &str, model: Arc<Mutex<InMemoryIndexModel>>) -> Result<(), ()> {
+    let dir = fs::read_dir(dir_path).map_err(|err| {
         eprintln!("ERROR: could not open directory {dir_path} for indexing: {err}")
     })?;
 
@@ -193,13 +215,17 @@ fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Resu
             })?;
 
         if file_path.is_dir() {
-            add_folder_to_model(file_path.to_string_lossy().to_string(), model)?
-        } else if model.requires_reindexing(&file_path, last_modified) {
+            add_folder_to_model(&file_path.to_string_lossy().to_string(), Arc::clone(&model))?
+        } else if model
+            .lock()
+            .unwrap()
+            .requires_reindexing(&file_path, last_modified)
+        {
             match read_from_file(&file_path) {
                 Ok(content) => {
                     println!("File: {file_path:?}");
 
-                    model.add_document(
+                    model.lock().unwrap().add_document(
                         file_path,
                         &content.chars().collect::<Vec<char>>(),
                         last_modified,
