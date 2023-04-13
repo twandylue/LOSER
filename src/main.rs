@@ -64,6 +64,8 @@ fn entry() -> Result<(), ()> {
 
             let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
             add_folder_to_model(&dir_path, Arc::clone(&model))?;
+
+            // TODO: why can this work?
             let model: &InMemoryIndexModel = &model.lock().unwrap();
             save_mode_as_json(model, &Path::new(&output_file_name))?;
         }
@@ -138,6 +140,7 @@ fn entry() -> Result<(), ()> {
             }
 
             {
+                // TODO: block?
                 let model = Arc::clone(&model);
 
                 thread::spawn(move || -> Result<(), ()> {
@@ -245,7 +248,7 @@ fn save_mode_as_json(model: &InMemoryIndexModel, file_path: &Path) -> Result<(),
         )
     })?;
 
-    serde_json::to_writer(BufWriter::new(file), &model)
+    serde_json::to_writer(BufWriter::new(file), model)
         .map_err(|err| eprintln!("ERROR: could not serialize index into the index file: {err}"))?;
 
     Ok(())
