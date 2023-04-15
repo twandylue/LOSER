@@ -65,8 +65,9 @@ fn entry() -> Result<(), ()> {
             let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
             add_folder_to_model(&dir_path, Arc::clone(&model))?;
 
-            // TODO: why can this work?
-            let model: &InMemoryIndexModel = &model.lock().unwrap();
+            let model = &*model.lock().unwrap();
+            // NOTE: or
+            // let model: &InMemoryIndexModel = &model.lock().unwrap();
             save_mode_as_json(model, &Path::new(&output_file_name))?;
         }
         "search" => {
@@ -140,7 +141,7 @@ fn entry() -> Result<(), ()> {
             }
 
             {
-                // TODO: block?
+                // TODO: what to do if this thread broken?
                 let model = Arc::clone(&model);
 
                 thread::spawn(move || -> Result<(), ()> {
@@ -196,7 +197,7 @@ fn add_folder_to_model(dir_path: &str, model: Arc<Mutex<InMemoryIndexModel>>) ->
 
     for path in dir {
         let file_path = path.map_err(|err| {
-            eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}"); 
+            eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}");
         })?.path();
 
         let last_modified = file_path
