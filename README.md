@@ -22,33 +22,34 @@ Create the index for a folder
 > You can find the `index.json` under the root directory of LOSER.
 
 ```console
-$ cargo run -- index ./src/data
+$ cargo run -- index ./data
 Indexing...
-File: "./src/data/test1.txt"
-File: "./src/data/test2.txt"
+File: "./data/test/test1.txt"
+File: "./data/test2.txt"
 ```
 
 Search
 
 ```console
-$ cargo run -- search ./src/index.json github
-File Path: ./src/data/test1.txt | Rank: 0.0029716683
-File Path: ./src/data/test2.txt | Rank: 0
+$ cargo run -- search ./data.loser.json github
+File Path: ./data/test/test1.txt | Rank: 0.0029716683
+File Path: ./data/test2.txt | Rank: 0
 ```
 
 Web Server
 
 ```console
-$ cargo run -- server
-...
+$ cargo run -- server ./data
+INFO: listening at http://127.0.0.1:8080/
+File: "./data/test2.txt"
+Finished indexing...
 ```
 
-Then go to [http://127.0.0.1:8080/](http://127.0.0.1:8080/)
+Then go to [http://127.0.0.1:8080/](http://127.0.0.1:8080/), you can use the web browser to search the equery.
 
 ## TODOs
-
 - [x] UI(a simple web server)
-- [ ] Auto-indexing by folder(background service)
+- [x] Auto-indexing by folder(background service)
 
 ## References
 

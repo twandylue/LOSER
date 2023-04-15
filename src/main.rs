@@ -8,6 +8,8 @@ use std::{
     path::Path,
     process::{exit, ExitCode},
     sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
 use web_server::WebServer;
 
@@ -49,18 +51,22 @@ fn entry() -> Result<(), ()> {
                 eprintln!("ERROR: no directory is provided for {subcommand} subcommand.");
             })?;
 
+            let folder_name = Path::new(&dir_path)
+                .file_name()
+                .ok_or_else(|| eprintln!("ERROR: could not extract the folder name: {dir_path}"))?;
+
+            let output_file_name = format!(
+                "{folder_name}.loser.json",
+                folder_name = folder_name.to_string_lossy().to_string()
+            );
+
             println!("Indexing...");
 
-            let mut model = InMemoryIndexModel::new();
-            add_folder_to_model(dir_path, &mut model)?;
+            let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
+            add_folder_to_model(&dir_path, Arc::clone(&model))?;
 
-            let index_file = fs::File::create("index.json").map_err(|err| {
-                eprintln!("ERROR: could not create the index file: {err}");
-            })?;
-
-            serde_json::to_writer(BufWriter::new(index_file), &model).map_err(|err| {
-                eprintln!("ERROR: could not serialize index into the index file: {err}")
-            })?;
+            let model = &*model.lock().unwrap();
+            save_mode_as_json(model, &Path::new(&output_file_name))?;
         }
         "search" => {
             let index_path = args.next().ok_or_else(|| {
@@ -93,26 +99,24 @@ fn entry() -> Result<(), ()> {
             return Ok(());
         }
         "server" => {
-            let file_path = args.next().ok_or_else(|| {
+            let dir_path = args.next().ok_or_else(|| {
                 prompt_usage(&program);
                 eprintln!("ERROR: no folder is provided for {subcommand} subcommand.")
             })?;
-
-            let mut index_path = Path::new(&file_path).to_path_buf();
-            index_path.push(".loser.json");
+            let index_path = Path::new(&format!("{dir_path}.loser.json")).to_path_buf();
 
             let port = args.next().unwrap_or("8080".to_string());
             let addr = format!("127.0.0.1:{port}");
 
-            // TODO: should be an error?
-            let is_existed = index_path.as_path().try_exists().map_err(|err| {
+            let is_existed = index_path.try_exists().map_err(|err| {
                 eprintln!(
                     "ERROR: could not check the existence of file {index_path}: {err}",
                     index_path = index_path.display()
                 )
             })?;
 
-            let model: Arc<Mutex<dyn Model>>;
+            // TODO: how to make it more generic?
+            let model: Arc<Mutex<InMemoryIndexModel>>;
 
             if is_existed {
                 let index_file = fs::File::open(&index_path).map_err(|err| {
@@ -134,7 +138,25 @@ fn entry() -> Result<(), ()> {
                 model = Arc::new(Mutex::<InMemoryIndexModel>::new(Default::default()));
             }
 
-            // TODO: add a background service for indexing files
+            {
+                // TODO: what to do if this thread broken?
+                let model = Arc::clone(&model);
+
+                thread::spawn(move || -> Result<(), ()> {
+                    loop {
+                        add_folder_to_model(
+                            &Path::new(&dir_path).to_string_lossy().to_string(),
+                            Arc::clone(&model),
+                        )?;
+                        let model = model.lock().unwrap();
+                        save_mode_as_json(&model, &index_path)?;
+
+                        println!("Finished indexing...");
+
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                });
+            }
 
             let server = WebServer::new(addr.as_str(), model);
 
@@ -166,14 +188,14 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
     }
 }
 
-fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Result<(), ()> {
-    let dir = fs::read_dir(dir_path.as_str()).map_err(|err| {
+fn add_folder_to_model(dir_path: &str, model: Arc<Mutex<InMemoryIndexModel>>) -> Result<(), ()> {
+    let dir = fs::read_dir(dir_path).map_err(|err| {
         eprintln!("ERROR: could not open directory {dir_path} for indexing: {err}")
     })?;
 
     for path in dir {
         let file_path = path.map_err(|err| {
-            eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}"); 
+            eprintln!("ERROR: could not read the file in directory: {dir_path} during indexing: {err}");
         })?.path();
 
         let last_modified = file_path
@@ -193,13 +215,17 @@ fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Resu
             })?;
 
         if file_path.is_dir() {
-            add_folder_to_model(file_path.to_string_lossy().to_string(), model)?
-        } else if model.requires_reindexing(&file_path, last_modified) {
+            add_folder_to_model(&file_path.to_string_lossy().to_string(), Arc::clone(&model))?
+        } else if model
+            .lock()
+            .unwrap()
+            .requires_reindexing(&file_path, last_modified)
+        {
             match read_from_file(&file_path) {
                 Ok(content) => {
                     println!("File: {file_path:?}");
 
-                    model.add_document(
+                    model.lock().unwrap().add_document(
                         file_path,
                         &content.chars().collect::<Vec<char>>(),
                         last_modified,
@@ -209,6 +235,20 @@ fn add_folder_to_model(dir_path: String, model: &mut InMemoryIndexModel) -> Resu
             }
         }
     }
+
+    Ok(())
+}
+
+fn save_mode_as_json(model: &InMemoryIndexModel, file_path: &Path) -> Result<(), ()> {
+    let file = fs::File::create(file_path).map_err(|err| {
+        eprintln!(
+            "ERROR: could not create the index file: {file_path}: {err}",
+            file_path = file_path.display()
+        )
+    })?;
+
+    serde_json::to_writer(BufWriter::new(file), model)
+        .map_err(|err| eprintln!("ERROR: could not serialize index into the index file: {err}"))?;
 
     Ok(())
 }
