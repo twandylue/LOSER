@@ -66,8 +66,6 @@ fn entry() -> Result<(), ()> {
             add_folder_to_model(&dir_path, Arc::clone(&model))?;
 
             let model = &*model.lock().unwrap();
-            // NOTE: or
-            // let model: &InMemoryIndexModel = &model.lock().unwrap();
             save_mode_as_json(model, &Path::new(&output_file_name))?;
         }
         "search" => {
