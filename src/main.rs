@@ -5,7 +5,7 @@ use serde_json;
 use std::{
     env, fs,
     io::BufWriter,
-    path::Path,
+    path::{Path, PathBuf},
     process::{exit, ExitCode},
     sync::{Arc, Mutex},
     thread,
@@ -60,8 +60,7 @@ fn entry() -> Result<(), ()> {
                 folder_name = folder_name.to_string_lossy().to_string()
             );
 
-            // TODO: Update index file after removing the file
-            println!("Indexing...");
+            println!("Indexing from scratch...");
 
             let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
             add_folder_to_model(&dir_path, Arc::clone(&model))?;
@@ -145,6 +144,26 @@ fn entry() -> Result<(), ()> {
 
                 thread::spawn(move || -> Result<(), ()> {
                     loop {
+                        // TODO: checking if the files existed need to be refactored
+                        let mut removed_files: Vec<PathBuf> = Vec::new();
+                        for path in model.lock().unwrap().docs.keys() {
+                            if path.try_exists().map_err(|err| {
+                                eprintln!(
+                                    "ERROR: could not check if the file {path} is existed: {err}",
+                                    path = path.display()
+                                )
+                            })? {
+                                continue;
+                            }
+
+                            println!("{file} does not existed anymore", file = path.display());
+                            removed_files.push(path.clone());
+                        }
+
+                        for file in removed_files {
+                            model.lock().unwrap().remove_document(&file)
+                        }
+
                         add_folder_to_model(
                             &Path::new(&dir_path).to_string_lossy().to_string(),
                             Arc::clone(&model),
@@ -152,6 +171,7 @@ fn entry() -> Result<(), ()> {
                         let model = model.lock().unwrap();
                         save_mode_as_json(&model, &index_path)?;
 
+                        drop(model);
                         println!("Finished indexing...");
 
                         thread::sleep(Duration::from_secs(1));
