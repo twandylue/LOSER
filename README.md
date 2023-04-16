@@ -4,7 +4,7 @@ Local search engine in Rust, aka **LOSER**!
 
 ## Introduction
 
-Using `tf-idf` to find the related files.
+Using [`tf-idf`](https://en.wikipedia.org/wiki/Tf%E2%80%93idf) to find the related files.
 
 ## How to use
 

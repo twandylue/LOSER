@@ -203,7 +203,7 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
     match extension.as_ref() {
         "txt" => PlainTextReader::read_text(&file_path),
         "pdf" => PDFReader::read_text(&file_path),
-        "xml" => todo!(),
+        // "xml" => todo!(),
         _ => {
             eprintln!("ERROR: The file type: {extension} has not been supported yet.");
             Err(())
