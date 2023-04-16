@@ -76,6 +76,8 @@ impl Model for InMemoryIndexModel {
         content: &[char],
         last_modified: SystemTime,
     ) -> Result<(), ()> {
+        self.remove_document(&file_path);
+
         let mut tf = TermFreq::new();
         let mut count = 0;
 
