@@ -1,8 +1,5 @@
+use super::reader_trait::Reader;
 use std::{fs, path::Path};
-
-pub trait Reader {
-    fn read_text(file_path: &Path) -> Result<String, ()>;
-}
 
 pub struct PlainTextReader {}
 

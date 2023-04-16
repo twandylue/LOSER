@@ -45,11 +45,14 @@ File: "./data/test2.txt"
 Finished indexing...
 ```
 
-Then go to [http://127.0.0.1:8080/](http://127.0.0.1:8080/), you can use the web browser to search the equery.
+Then go to [http://127.0.0.1:8080/](http://127.0.0.1:8080/), you can use the web browser to search the query.
 
 ## TODOs
+
 - [x] UI(a simple web server)
 - [x] Auto-indexing by folder(background service)
+- [x] Extract text from PDF
+- [ ] Extract text from XML
 
 ## References
 

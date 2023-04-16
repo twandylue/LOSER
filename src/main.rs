@@ -1,5 +1,5 @@
 use model::in_memory_index_model::{InMemoryIndexModel, Model};
-use reader::plain_text_reader::{PlainTextReader, Reader};
+use reader::{pdf_reader::PDFReader, plain_text_reader::PlainTextReader, reader_trait::Reader};
 use serde::Deserialize;
 use serde_json;
 use std::{
@@ -60,6 +60,7 @@ fn entry() -> Result<(), ()> {
                 folder_name = folder_name.to_string_lossy().to_string()
             );
 
+            // TODO: Update index file after removing the file
             println!("Indexing...");
 
             let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
@@ -180,7 +181,9 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
         .to_string_lossy();
 
     match extension.as_ref() {
-        "txt" => PlainTextReader::read_text(file_path),
+        "txt" => PlainTextReader::read_text(&file_path),
+        "pdf" => PDFReader::read_text(&file_path),
+        "xml" => todo!(),
         _ => {
             eprintln!("ERROR: The file type: {extension} has not been supported yet.");
             Err(())
@@ -223,7 +226,7 @@ fn add_folder_to_model(dir_path: &str, model: Arc<Mutex<InMemoryIndexModel>>) ->
         {
             match read_from_file(&file_path) {
                 Ok(content) => {
-                    println!("File: {file_path:?}");
+                    println!("File path: {file_path}", file_path = file_path.display());
 
                     model.lock().unwrap().add_document(
                         file_path,
