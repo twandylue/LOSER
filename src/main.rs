@@ -156,7 +156,7 @@ fn entry() -> Result<(), ()> {
                                 continue;
                             }
 
-                            println!("{file} does not existed anymore", file = path.display());
+                            println!("{file} does not exist anymore", file = path.display());
                             removed_files.push(path.clone());
                         }
 
@@ -279,7 +279,7 @@ fn save_mode_as_json(model: &InMemoryIndexModel, file_path: &Path) -> Result<(),
 fn prompt_usage(program: &str) {
     eprintln!("Usage: {program} [SUBCOMMAND] [OPTIONS]");
     eprintln!("Subcommands and options:");
-    eprintln!("     index <folder>                    index the <folder> and save the index to index.json file.");
+    eprintln!("     index <folder>                    index the <folder> from scratch and save the index to '<folder>.loser.json' file");
     eprintln!("     search <index-file> <query>       search <query> within the <index-file>");
     eprintln!("     server <folder> [port]            search on local HTTP server within files in <folder>");
 }

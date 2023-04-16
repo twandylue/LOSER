@@ -14,8 +14,9 @@ Help
 $ cargo run -- help
 Usage: target/debug/serust [SUBCOMMAND] [OPTIONS]
 Subcommands and options:
-     index <folder>                    index the <folder> from scratch and save the index as `<folder>.loser.json` file.
+     index <folder>                    index the <folder> from scratch and save the index to '<folder>.loser.json' file
      search <index-file> <query>       search <query> within the <index-file>
+     server <folder> [port]            search on local HTTP server within files in <folder>
 ```
 
 Create the index file for a folder
