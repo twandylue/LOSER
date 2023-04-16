@@ -14,18 +14,20 @@ Help
 $ cargo run -- help
 Usage: target/debug/serust [SUBCOMMAND] [OPTIONS]
 Subcommands and options:
-     index <folder>                    index the <folder> and save the index to index.json file.
+     index <folder>                    index the <folder> from scratch and save the index as `<folder>.loser.json` file.
      search <index-file> <query>       search <query> within the <index-file>
 ```
 
-Create the index for a folder
-> You can find the `index.json` under the root directory of LOSER.
+Create the index file for a folder
+> You can find the `<folder>.loser.json` as a index file under the root directory of LOSER.
 
 ```console
 $ cargo run -- index ./data
-Indexing...
-File: "./data/test/test1.txt"
-File: "./data/test2.txt"
+Indexing from scratch...
+File path: ./data/test/test1.txt
+File path: ./data/test2.txt
+File path: ./data/pdf-sample.pdf
+...
 ```
 
 Search
@@ -34,6 +36,7 @@ Search
 $ cargo run -- search ./data.loser.json github
 File Path: ./data/test/test1.txt | Rank: 0.0029716683
 File Path: ./data/test2.txt | Rank: 0
+...
 ```
 
 Web Server
@@ -41,7 +44,8 @@ Web Server
 ```console
 $ cargo run -- server ./data
 INFO: listening at http://127.0.0.1:8080/
-File: "./data/test2.txt"
+File Path: "./data/test2.txt"
+...
 Finished indexing...
 ```
 
@@ -53,6 +57,7 @@ Then go to [http://127.0.0.1:8080/](http://127.0.0.1:8080/), you can use the web
 - [x] Auto-indexing by folder(background service)
 - [x] Extract text from PDF
 - [ ] Extract text from XML
+- [ ] Show indexing progress
 
 ## References
 
