@@ -19,19 +19,20 @@ pub trait Model {
 
 type TermFreq = HashMap<String, usize>;
 type FileTF = HashMap<PathBuf, Doc>;
+// NOTE: DocFreq: Appearing times of different tokens in different docs
 type DocFreq = HashMap<String, usize>;
 
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Doc {
     tf: TermFreq,
-    count: usize, // NOTE: Total tokens
+    total_tokens: usize,
     last_modified: SystemTime,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct InMemoryIndexModel {
     pub docs: FileTF,
-    pub df: DocFreq, // NOTE: Frequency of different tokens in different docs
+    pub df: DocFreq,
 }
 
 impl InMemoryIndexModel {
@@ -44,7 +45,7 @@ impl InMemoryIndexModel {
 }
 
 fn compute_tf(token: &str, doc: &Doc) -> f32 {
-    let m = doc.count as f32;
+    let m = doc.total_tokens as f32;
     let n = doc.tf.get(token).cloned().unwrap_or(0) as f32;
     n / m
 }
@@ -95,7 +96,7 @@ impl Model for InMemoryIndexModel {
 
         let doc = Doc {
             tf,
-            count,
+            total_tokens: count,
             last_modified,
         };
         self.docs.insert(file_path, doc);
@@ -124,8 +125,8 @@ impl Model for InMemoryIndexModel {
 
 #[cfg(test)]
 mod tests {
+    use super::super::in_memory_index_model::Doc;
     use super::{InMemoryIndexModel, Model};
-    use crate::model::in_memory_index_model::Doc;
     use std::{
         collections::HashMap,
         ops::Add,
@@ -150,7 +151,7 @@ mod tests {
                 ("IS".to_string(), 1),
                 (".".to_string(), 1),
             ]),
-            count: 4,
+            total_tokens: 4,
             last_modified: time,
         };
         expected.docs.insert(path.clone(), expected_doc);
