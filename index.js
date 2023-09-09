@@ -11,7 +11,7 @@ async function search(query) {
     let item = document.createElement("span");
     item.appendChild(document.createTextNode(path));
     item.appendChild(document.createTextNode(" | "));
-    item.appendChild(document.createTextNode("rank: " + rank));
+    item.appendChild(document.createTextNode(rank));
     item.appendChild(document.createElement("br"));
     results.appendChild(item)
   }
