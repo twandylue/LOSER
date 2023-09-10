@@ -1,11 +1,11 @@
 use model::in_memory_index_model::{InMemoryIndexModel, Model};
-use reader::plain_text_reader::{PlainTextReader, Reader};
+use reader::{pdf_reader::PDFReader, plain_text_reader::PlainTextReader, reader_trait::Reader};
 use serde::Deserialize;
 use serde_json;
 use std::{
     env, fs,
     io::BufWriter,
-    path::Path,
+    path::{Path, PathBuf},
     process::{exit, ExitCode},
     sync::{Arc, Mutex},
     thread,
@@ -60,7 +60,7 @@ fn entry() -> Result<(), ()> {
                 folder_name = folder_name.to_string_lossy().to_string()
             );
 
-            println!("Indexing...");
+            println!("Indexing from scratch...");
 
             let model = Arc::new(Mutex::new(InMemoryIndexModel::new()));
             add_folder_to_model(&dir_path, Arc::clone(&model))?;
@@ -144,6 +144,26 @@ fn entry() -> Result<(), ()> {
 
                 thread::spawn(move || -> Result<(), ()> {
                     loop {
+                        // TODO: checking if the files existed need to be refactored
+                        let mut removed_files: Vec<PathBuf> = Vec::new();
+                        for path in model.lock().unwrap().docs.keys() {
+                            if path.try_exists().map_err(|err| {
+                                eprintln!(
+                                    "ERROR: could not check if the file {path} is existed: {err}",
+                                    path = path.display()
+                                )
+                            })? {
+                                continue;
+                            }
+
+                            println!("{file} does not exist anymore", file = path.display());
+                            removed_files.push(path.clone());
+                        }
+
+                        for file in removed_files {
+                            model.lock().unwrap().remove_document(&file)
+                        }
+
                         add_folder_to_model(
                             &Path::new(&dir_path).to_string_lossy().to_string(),
                             Arc::clone(&model),
@@ -151,6 +171,7 @@ fn entry() -> Result<(), ()> {
                         let model = model.lock().unwrap();
                         save_mode_as_json(&model, &index_path)?;
 
+                        drop(model);
                         println!("Finished indexing...");
 
                         thread::sleep(Duration::from_secs(1));
@@ -180,7 +201,9 @@ fn read_from_file(file_path: &Path) -> Result<String, ()> {
         .to_string_lossy();
 
     match extension.as_ref() {
-        "txt" => PlainTextReader::read_text(file_path),
+        "txt" => PlainTextReader::read_text(&file_path),
+        "pdf" => PDFReader::read_text(&file_path),
+        // "xml" => todo!(),
         _ => {
             eprintln!("ERROR: The file type: {extension} has not been supported yet.");
             Err(())
@@ -223,7 +246,7 @@ fn add_folder_to_model(dir_path: &str, model: Arc<Mutex<InMemoryIndexModel>>) ->
         {
             match read_from_file(&file_path) {
                 Ok(content) => {
-                    println!("File: {file_path:?}");
+                    println!("File path: {file_path}", file_path = file_path.display());
 
                     model.lock().unwrap().add_document(
                         file_path,
@@ -256,7 +279,7 @@ fn save_mode_as_json(model: &InMemoryIndexModel, file_path: &Path) -> Result<(),
 fn prompt_usage(program: &str) {
     eprintln!("Usage: {program} [SUBCOMMAND] [OPTIONS]");
     eprintln!("Subcommands and options:");
-    eprintln!("     index <folder>                    index the <folder> and save the index to index.json file.");
+    eprintln!("     index <folder>                    index the <folder> from scratch and save the index to '<folder>.loser.json' file");
     eprintln!("     search <index-file> <query>       search <query> within the <index-file>");
     eprintln!("     server <folder> [port]            search on local HTTP server within files in <folder>");
 }
